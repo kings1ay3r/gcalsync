@@ -35,7 +35,7 @@ gem "bootsnap", require: false
 gem "dotenv-rails", groups: [ :development, :test ]
 
 # Use Google Auth & API Client
-gem "googleauth"
+gem "googleauth", "~> 1.0"
 gem "google-api-client", "~> 0.53.0"
 
 
