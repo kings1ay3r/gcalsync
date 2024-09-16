@@ -15,9 +15,6 @@ A Ruby on Rails application that syncs events with Google Calendar and manages c
 - [Google Calendar Integration](#google-calendar-integration)
   - [Setting Up Google API Credentials](#setting-up-google-api-credentials)
   - [Google OAuth Setup](#google-oauth-setup)
-- [Functionality](#functionality)
-  - [Syncing Events](#syncing-events)
-  - [Watch Requests](#watch-requests)
 - [Contributing](#contributing)
 - [License](#license)
 
