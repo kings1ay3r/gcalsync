@@ -355,7 +355,7 @@ DEPENDENCIES
   debug
   dotenv-rails
   google-api-client (~> 0.53.0)
-  googleauth
+  googleauth (~> 1.0)
   importmap-rails
   jbuilder
   pg (~> 1.1)

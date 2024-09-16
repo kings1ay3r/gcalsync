@@ -1,40 +1,50 @@
 require "googleauth"
 require "google/apis/calendar_v3"
+require_relative "../../lib/in_memory_token_store"  # Adjust the path as needed
 
 class GoogleCalendarsController < ApplicationController
   def connect
-    client_id = ENV["GOOGLE_CLIENT_ID"]
-    client_secret = ENV["GOOGLE_CLIENT_SECRET"]
-    callback_url = ENV["GOOGLE_CALLBACK_URL"]
+    client_id = Google::Auth::ClientId.new(
+      ENV["GOOGLE_CLIENT_ID"],
+      ENV["GOOGLE_CLIENT_SECRET"]
+    )
 
-    authorizer = Google::Auth::WebUserAuthorizer.new(
+    # Use a custom in-memory token store or replace with your preferred storage
+    token_store = InMemoryTokenStore.new  # Assuming you have created InMemoryTokenStore
+
+    authorizer = Google::Auth::UserAuthorizer.new(
       client_id,
       Google::Apis::CalendarV3::AUTH_CALENDAR,
-      client_secret
+      token_store
     )
+
+    callback_url = ENV["GOOGLE_CALLBACK_URL"]
 
     auth_url = authorizer.get_authorization_url(
-      base_url: callback_url,
-      scope: Google::Apis::CalendarV3::AUTH_CALENDAR
+      base_url: callback_url
     )
 
-    redirect_to auth_url
+    redirect_to auth_url, allow_other_host: true
   end
 
   def callback
-    client_id = ENV["GOOGLE_CLIENT_ID"]
-    client_secret = ENV["GOOGLE_CLIENT_SECRET"]
-
-    authorizer = Google::Auth::WebUserAuthorizer.new(
-      client_id,
-      Google::Apis::CalendarV3::AUTH_CALENDAR,
-      client_secret
+    client_id = Google::Auth::ClientId.new(
+      ENV["GOOGLE_CLIENT_ID"],
+      ENV["GOOGLE_CLIENT_SECRET"]
     )
 
-    credentials = authorizer.get_credentials_from_code(
+    token_store = InMemoryTokenStore.new  # Assuming you have created InMemoryTokenStore
+
+    authorizer = Google::Auth::UserAuthorizer.new(
+      client_id,
+      Google::Apis::CalendarV3::AUTH_CALENDAR,
+      token_store
+    )
+
+    credentials = authorizer.get_and_store_credentials_from_code(
       user_id: current_user.id,
       code: params[:code],
-      base_url: callback_url
+      base_url: ENV["GOOGLE_CALLBACK_URL"]
     )
 
     current_user.update(
