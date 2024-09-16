@@ -9,6 +9,10 @@ Rails.application.routes.draw do
   get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
   get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
 
-  # Defines the root path route ("/")
-  # root "posts#index"
+    # Defines the root path route ("/")
+
+    resources :calendars, only: [ :index ]
+    get "google_calendar/connect", to: "google_calendars#connect"
+    get "google_calendar/callback", to: "google_calendars#callback"
+    get "google_calendar/sync_events", to: "google_calendars#sync_events"
 end

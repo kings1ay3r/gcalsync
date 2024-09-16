@@ -1,0 +1,10 @@
+<h1>Calendar Events</h1>
+
+<% @calendars.each do |calendar| %>
+  <h2><%= calendar.name %></h2>
+  <ul>
+    <% calendar.events.each do |event| %>
+      <li><%= event.title %> - <%= event.start_time.strftime('%Y-%m-%d %H:%M') %> to <%= event.end_time.strftime('%Y-%m-%d %H:%M') %></li>
+    <% end %>
+  </ul>
+<% end %>
