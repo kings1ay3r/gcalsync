@@ -42,6 +42,11 @@ gem "google-api-client", "~> 0.53.0"
 gem "bcrypt", "~> 3.1.7"
 
 
+ # testing
+ gem "rspec-rails"
+ gem "vcr"
+ gem "webmock"
+
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 # gem "image_processing", "~> 1.2"
 
