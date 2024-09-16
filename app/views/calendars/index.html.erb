@@ -1,10 +1,57 @@
 <h1>Calendar Events</h1>
 
-<% @calendars.each do |calendar| %>
-  <h2><%= calendar.name %></h2>
-  <ul>
-    <% calendar.events.each do |event| %>
-      <li><%= event.title %> - <%= event.start_time.strftime('%Y-%m-%d %H:%M') %> to <%= event.end_time.strftime('%Y-%m-%d %H:%M') %></li>
+<%= link_to 'Add Account', google_connect_path, class: 'btn btn-primary', method: :get %>
+<%= link_to 'Sign Out', sign_out_path, class: 'btn btn-danger', method: :delete, data: { confirm: 'Are you sure you want to sign out?' } %>
+<br />
+<div>
+  <% if @calendar %>
+    <h2 class="text-primary"><%= @calendar.name %></h2>
+    <table class="table table-striped table-bordered">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Start Time</th>
+          <th>End Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @events.each do |event| %>
+          <tr>
+            <td><%= event.title %></td>
+            <td><%= event.start_time.present? ? event.start_time.strftime('%Y-%m-%d %H:%M') : 'No start time' %></td>
+            <td><%= event.end_time.present? ? event.end_time.strftime('%Y-%m-%d %H:%M') : 'No end time' %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <% if @calendars %>
+      <% @calendars.each do |calendar| %>
+        <%= link_to calendar.name, calendars_path(calendar_id: calendar.id) %>
+      <% end %>
+      <% @calendars.each do |calendar| %>
+        <div class="calendar-section mb-5">
+          <h2 class="text-primary"><%= calendar.name %></h2>
+          <table class="table table-striped table-bordered">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% calendar.events.each do |event| %>
+                <tr>
+                  <td><%= event.title %></td>
+                  <td><%= event.start_time.present? ? event.start_time.strftime('%Y-%m-%d %H:%M') : 'No start time' %></td>
+                  <td><%= event.end_time.present? ? event.end_time.strftime('%Y-%m-%d %H:%M') : 'No end time' %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% end %>
     <% end %>
-  </ul>
-<% end %>
+  <% end %>
+</div>

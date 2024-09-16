@@ -3,58 +3,59 @@ require "google/apis/calendar_v3"
 require_relative "../../lib/in_memory_token_store"  # Adjust the path as needed
 
 class GoogleCalendarsController < ApplicationController
-  def connect
-    client_id = Google::Auth::ClientId.new(
-      ENV["GOOGLE_CLIENT_ID"],
-      ENV["GOOGLE_CLIENT_SECRET"]
-    )
+    before_action :require_login
 
-    # Use a custom in-memory token store or replace with your preferred storage
-    token_store = InMemoryTokenStore.new  # Assuming you have created InMemoryTokenStore
+    def connect
+        client_id = Google::Auth::ClientId.new(
+          ENV["GOOGLE_CLIENT_ID"],
+          ENV["GOOGLE_CLIENT_SECRET"]
+        )
 
-    authorizer = Google::Auth::UserAuthorizer.new(
-      client_id,
-      Google::Apis::CalendarV3::AUTH_CALENDAR,
-      token_store
-    )
+        token_store = InMemoryTokenStore.new
 
-    callback_url = ENV["GOOGLE_CALLBACK_URL"]
+        authorizer = Google::Auth::UserAuthorizer.new(
+          client_id,
+          Google::Apis::CalendarV3::AUTH_CALENDAR,
+          token_store
+        )
 
-    auth_url = authorizer.get_authorization_url(
-      base_url: callback_url
-    )
+        callback_url = ENV["GOOGLE_CALLBACK_URL"]
 
-    redirect_to auth_url, allow_other_host: true
-  end
+        auth_url = authorizer.get_authorization_url(
+          base_url: callback_url
+        )
 
-  def callback
-    client_id = Google::Auth::ClientId.new(
-      ENV["GOOGLE_CLIENT_ID"],
-      ENV["GOOGLE_CLIENT_SECRET"]
-    )
+        redirect_to auth_url, allow_other_host: true
+      end
 
-    token_store = InMemoryTokenStore.new  # Assuming you have created InMemoryTokenStore
+      def callback
+        client_id = Google::Auth::ClientId.new(
+          ENV["GOOGLE_CLIENT_ID"],
+          ENV["GOOGLE_CLIENT_SECRET"]
+        )
 
-    authorizer = Google::Auth::UserAuthorizer.new(
-      client_id,
-      Google::Apis::CalendarV3::AUTH_CALENDAR,
-      token_store
-    )
+        token_store = InMemoryTokenStore.new
 
-    credentials = authorizer.get_and_store_credentials_from_code(
-      user_id: current_user.id,
-      code: params[:code],
-      base_url: ENV["GOOGLE_CALLBACK_URL"]
-    )
+        authorizer = Google::Auth::UserAuthorizer.new(
+          client_id,
+          Google::Apis::CalendarV3::AUTH_CALENDAR,
+          token_store
+        )
 
-    current_user.update(
-      google_access_token: credentials.access_token,
-      google_refresh_token: credentials.refresh_token
-    )
+        credentials = authorizer.get_and_store_credentials_from_code(
+          user_id: current_user.id,
+          code: params[:code],
+          base_url: ENV["GOOGLE_CALLBACK_URL"]
+        )
 
-    sync_events
-    redirect_to calendars_path, notice: "Events synced successfully!"
-  end
+        current_user.update(
+          google_access_token: credentials.access_token,
+          google_refresh_token: credentials.refresh_token
+        )
+
+        sync_events
+        redirect_to calendars_path, notice: "Events synced successfully!"
+      end
 
   def sync_events
     service = Google::Apis::CalendarV3::CalendarService.new
@@ -65,6 +66,7 @@ class GoogleCalendarsController < ApplicationController
     calendar_list.items.each do |google_calendar|
       calendar = Calendar.find_or_create_by(google_id: google_calendar.id) do |cal|
         cal.name = google_calendar.summary
+        cal.user_id = current_user.id
       end
 
       events = service.list_events(google_calendar.id)
@@ -79,5 +81,57 @@ class GoogleCalendarsController < ApplicationController
         end
       end
     end
+  end
+  def set_up_watch_request
+    service = initialize_google_calendar_service
+
+    calendar_list = service.list_calendar_lists
+    calendar_list.items.each do |calendar|
+      watch = Watch.find_by(calendar_id: calendar.id)
+      if watch
+        destroy_watch(calendar.id)
+      end
+
+      watch = create_watch_request(service, calendar.id)
+      Watch.create(calendar_id: calendar.id, watch_id: watch[:resourceId], expiration: Time.at(watch[:expiration] / 1000))
+    end
+  end
+
+  def create_watch_request(service, calendar_id)
+    request_body = {
+      type: "web_hook",
+      address: ENV["WEBHOOK_URL"],
+      token: SecureRandom.hex(16)
+    }
+
+    service.insert_channel("v3", request_body, calendar_id)
+  end
+
+  def destroy_watch(calendar_id)
+    watch = Watch.find_by(calendar_id: calendar_id)
+    return unless watch
+
+    service = initialize_google_calendar_service
+    service.stop_channel(watch.watch_id)
+
+    watch.destroy
+  end
+
+  def initialize_google_calendar_service
+    client_id = Google::Auth::ClientId.new(
+      ENV["GOOGLE_CLIENT_ID"],
+      ENV["GOOGLE_CLIENT_SECRET"]
+    )
+    token_store = InMemoryTokenStore.new
+    authorizer = Google::Auth::UserAuthorizer.new(
+      client_id,
+      Google::Apis::CalendarV3::AUTH_CALENDAR,
+      token_store
+    )
+    credentials = authorizer.get_credentials(current_user.id)
+    service = Google::Apis::CalendarV3::CalendarService.new
+    service.client_options.application_name = ENV["GOOGLE_APP_NAME"]
+    service.authorization = credentials
+    service
   end
 end
