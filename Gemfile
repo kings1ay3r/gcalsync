@@ -41,11 +41,14 @@ gem "google-api-client", "~> 0.53.0"
 # Use bcrypt for password encryption
 gem "bcrypt", "~> 3.1.7"
 
+# auth helper
+gem "devise"
 
- # testing
- gem "rspec-rails"
- gem "vcr"
- gem "webmock"
+# testing
+gem "rspec-rails"
+gem "factory_bot_rails"
+gem "faker"
+gem "webmock"    # For mocking external API calls
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 # gem "image_processing", "~> 1.2"

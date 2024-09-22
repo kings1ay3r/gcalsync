@@ -76,12 +76,19 @@ class GoogleCalendarsController < ApplicationController
           google_event_id: google_event.id
         ) do |event|
           event.title = google_event.summary
-          event.start_time = google_event.start.date_time
-          event.end_time = google_event.end.date_time
+
+          if google_event.start.date
+            event.start_time = google_event.start.date.to_time.beginning_of_day
+            event.end_time = google_event.end.date.to_time.end_of_day
+          else
+            event.start_time = google_event.start.date_time
+            event.end_time = google_event.end.date_time
+          end
         end
       end
     end
   end
+
   def set_up_watch_request
     service = initialize_google_calendar_service
 
