@@ -3,59 +3,60 @@ require "google/apis/calendar_v3"
 require_relative "../../lib/in_memory_token_store"  # Adjust the path as needed
 
 class GoogleCalendarsController < ApplicationController
-    before_action :require_login
+  before_action :require_login
 
-    def connect
-        client_id = Google::Auth::ClientId.new(
-          ENV["GOOGLE_CLIENT_ID"],
-          ENV["GOOGLE_CLIENT_SECRET"]
-        )
+  skip_before_action :verify_authenticity_token, only: [ :webhook ]
+  def connect
+    client_id = Google::Auth::ClientId.new(
+      ENV["GOOGLE_CLIENT_ID"],
+      ENV["GOOGLE_CLIENT_SECRET"]
+    )
 
-        token_store = InMemoryTokenStore.new
+    token_store = InMemoryTokenStore.new
 
-        authorizer = Google::Auth::UserAuthorizer.new(
-          client_id,
-          Google::Apis::CalendarV3::AUTH_CALENDAR,
-          token_store
-        )
+    authorizer = Google::Auth::UserAuthorizer.new(
+      client_id,
+      Google::Apis::CalendarV3::AUTH_CALENDAR,
+      token_store
+    )
 
-        callback_url = ENV["GOOGLE_CALLBACK_URL"]
+    callback_url = ENV["GOOGLE_CALLBACK_URL"]
 
-        auth_url = authorizer.get_authorization_url(
-          base_url: callback_url
-        )
+    auth_url = authorizer.get_authorization_url(
+      base_url: callback_url
+    )
 
-        redirect_to auth_url, allow_other_host: true
-      end
+    redirect_to auth_url, allow_other_host: true
+  end
 
-      def callback
-        client_id = Google::Auth::ClientId.new(
-          ENV["GOOGLE_CLIENT_ID"],
-          ENV["GOOGLE_CLIENT_SECRET"]
-        )
+  def callback
+    client_id = Google::Auth::ClientId.new(
+      ENV["GOOGLE_CLIENT_ID"],
+      ENV["GOOGLE_CLIENT_SECRET"]
+    )
 
-        token_store = InMemoryTokenStore.new
+    token_store = InMemoryTokenStore.new
 
-        authorizer = Google::Auth::UserAuthorizer.new(
-          client_id,
-          Google::Apis::CalendarV3::AUTH_CALENDAR,
-          token_store
-        )
+    authorizer = Google::Auth::UserAuthorizer.new(
+      client_id,
+      Google::Apis::CalendarV3::AUTH_CALENDAR,
+      token_store
+    )
 
-        credentials = authorizer.get_and_store_credentials_from_code(
-          user_id: current_user.id,
-          code: params[:code],
-          base_url: ENV["GOOGLE_CALLBACK_URL"]
-        )
+    credentials = authorizer.get_and_store_credentials_from_code(
+      user_id: current_user.id,
+      code: params[:code],
+      base_url: ENV["GOOGLE_CALLBACK_URL"]
+    )
 
-        current_user.update(
-          google_access_token: credentials.access_token,
-          google_refresh_token: credentials.refresh_token
-        )
+    current_user.update(
+      google_access_token: credentials.access_token,
+      google_refresh_token: credentials.refresh_token
+    )
 
-        sync_events
-        redirect_to calendars_path, notice: "Events synced successfully!"
-      end
+    sync_events
+    redirect_to calendars_path, notice: "Events synced successfully!"
+  end
 
   def sync_events
     service = Google::Apis::CalendarV3::CalendarService.new
@@ -64,10 +65,10 @@ class GoogleCalendarsController < ApplicationController
     calendar_list = service.list_calendar_lists
 
     calendar_list.items.each do |google_calendar|
-      calendar = Calendar.find_or_create_by(google_id: google_calendar.id) do |cal|
-        cal.name = google_calendar.summary
-        cal.user_id = current_user.id
-      end
+      calendar = Calendar.find_or_initialize_by(google_id: google_calendar.id)
+      calendar.name ||= google_calendar.summary
+      calendar.user = current_user
+      calendar.save!
 
       events = service.list_events(google_calendar.id)
       events.items.each do |google_event|
@@ -88,6 +89,7 @@ class GoogleCalendarsController < ApplicationController
       end
     end
   end
+
 
   def set_up_watch_request
     service = initialize_google_calendar_service
@@ -140,5 +142,48 @@ class GoogleCalendarsController < ApplicationController
     service.client_options.application_name = ENV["GOOGLE_APP_NAME"]
     service.authorization = credentials
     service
+  end
+
+  def webhook
+    if params[:token] != ENV["WEBHOOK_SECRET_TOKEN"]
+      head :unauthorized
+      return
+    end
+
+    resource_id = request.headers["X-Goog-Resource-ID"]
+    expiration = request.headers["X-Goog-Channel-Expiration"]
+
+    watch = Watch.find_by(watch_id: resource_id)
+
+    if watch
+      if expiration.present? && Time.at(expiration.to_i / 1000) < 1.day.from_now
+        renew_watch(watch)
+      end
+
+      sync_events_from_google_calendar(watch.calendar_id)
+    end
+
+    head :ok
+  end
+
+  private
+
+  def sync_events_from_google_calendar(calendar_id)
+    service = initialize_google_calendar_service
+    events = service.list_events(calendar_id)
+
+    events.items.each do |google_event|
+      calendar = Calendar.find_by(google_id: calendar_id)
+
+      Event.find_or_create_by(
+        calendar: calendar,
+        google_event_id: google_event.id
+      ) do |event|
+        event.title = google_event.summary
+        event.start_time = google_event.start.date_time || google_event.start.date.to_time
+        event.end_time = google_event.end.date_time || google_event.end.date.to_time
+        event.save
+      end
+    end
   end
 end

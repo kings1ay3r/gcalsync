@@ -5,6 +5,7 @@
 <br />
 <div>
   <% if @calendar %>
+        <%= link_to 'Show All Calendars', calendars_path, class: 'btn btn-secondary mb-3' %>
     <h2 class="text-primary"><%= @calendar.name %></h2>
     <table class="table table-striped table-bordered">
       <thead>
@@ -26,10 +27,6 @@
     </table>
   <% else %>
     <% if @calendars %>
-
-      <% if @calendars %>
-        <%= link_to 'Show All Calendars', calendars_path, class: 'btn btn-secondary mb-3' %>
-      <% end %>
       <% @calendars.each do |calendar| %>
         <%= link_to calendar.name, calendars_path(calendar_id: calendar.id) %>
       <% end %>

@@ -41,6 +41,11 @@ gem "google-api-client", "~> 0.53.0"
 # Use bcrypt for password encryption
 gem "bcrypt", "~> 3.1.7"
 
+# for scheduler to set up watches and manage expiry of watches
+gem "sidekiq"
+gem "sidekiq-scheduler"
+
+
 # auth helper
 gem "devise"
 
